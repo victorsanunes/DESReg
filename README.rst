@@ -15,10 +15,10 @@ Modules
 ------------
 The package includes two folders with the following contents:
 
-1. ***DESReg.desReg***:  
+1 **DESReg.desReg**:  
     - des.DESRegression: Implementation of all ensemble functionalities. 
     - utils.measures: Implementation of various error and aggregation measures for the base regressors.
-2. ***DESReg.examples***: Examples with code for creating and using regression ensembles. 
+2 **DESReg.examples**: Examples with code for creating and using regression ensembles. 
 
 
 Parameters and configuration
