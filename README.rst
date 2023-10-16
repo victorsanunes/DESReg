@@ -13,12 +13,12 @@ State of art dynamic techniques in dynamic selection [1]_ [2]_ can be accessed t
 
 Modules
 ------------
-The package includes three folders with the following contents:
+The package includes two folders with the following contents:
 
-- des.dataset: with a dataset 
-- des.DESRegression: Implementation of all ensemble functionalities. 
-- utils.measures: Implementation of various error and aggregation measures for the base regressors.
-
+1. DESReg.desReg:  
+    - des.DESRegression: Implementation of all ensemble functionalities. 
+    - utils.measures: Implementation of various error and aggregation measures for the base regressors.
+2. DESReg.examples: Examples with code for creating and using regression ensembles. 
 
 
 Parameters and configuration
@@ -67,15 +67,15 @@ Basis use of DESReg:
 
 .. code-block:: python
 
-	import numpy as np
-	import pandas as pd
-	from sklearn.model_selection import train_test_split
-	from desReg.dataset import load_Student_Mark
 	from desReg.des.DESRegression import DESRegression
-	from sklearn.metrics import mean_squared_error
-	import math
+	from desReg.dataset import load_Student_Mark
 
-	#Loading and splitting data
+	import numpy as np
+
+	from sklearn.model_selection import train_test_split
+	from sklearn.metrics import mean_squared_error
+
+
 	data = load_Student_Mark()
 	X = data.iloc[:,:-1].to_numpy()
 	y = np.ravel(data.iloc[:, -1:]) 
@@ -84,10 +84,10 @@ Basis use of DESReg:
 	# DES declaration
 	homogeneous_DES = DESRegression()
 	# DES fitting
-	homogeneous_DES.fit(X_train ,y_train )
+	homogeneous_DES.fit(X_train, y_train)
 	# DES prediction
 	y_pred = homogeneous_DES.predict(X_test)
-	print('RMSE error:', math.sqrt(mean_squared_error(y_test, y_pred)))
+	print('MSE error:', mean_squared_error(y_test, y_pred))
 
 
 Citation
