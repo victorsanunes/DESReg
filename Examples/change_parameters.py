@@ -8,7 +8,6 @@ from sklearn.metrics import mean_squared_error
 from sklearn.svm import SVR
 from sklearn.linear_model import Lasso
 
-
 from scipy.spatial import distance
 
 data = load_Student_Mark()
