@@ -98,6 +98,6 @@ If you use DESReg in a scientific paper, please consider citing the following pa
 
 References:
 ---------
-.. [1] R. M. O. Cruz, R. Sabourin, and G. D. Cavalcanti, “Dynamic classifier selection: Recent advances and perspectives,” Information Fusion, vol. 41, pp. 195 – 216, 2018.
-.. [2] Thiago J.M. Moura and George D.C. Cavalcanti and Luiz S. Oliveira, "MINE: A framework for dynamic regressor selection",Information Sciences, vol. 543, pages 157-179, 2021.
+.. [1] R.M.O. Cruz, R. Sabourin, and G. D. Cavalcanti, "Dynamic classifier selection: Recent advances and perspectives" Information Fusion, vol. 41, pp. 195 – 216, 2018.
+.. [2] Thiago J.M. Moura and George D.C. Cavalcanti and Luiz S. Oliveira, "MINE: A framework for dynamic regressor selection" Information Sciences, vol. 543, pages 157-179, 2021.
 .. _scikit-learn: http://scikit-learn.org/stable/
