@@ -4,8 +4,8 @@
 .. image:: https://img.shields.io/badge/License-MIT-blue.svg
    :target: https://opensource.org/license/mit/
 
-.. |GitHub license| image:: https://img.shields.io/github/license/Naereen/StrapDown.js.svg
-   :target: https://github.com/Naereen/StrapDown.js/blob/master/LICENSE
+.. image:: https://img.shields.io/badge/docs-autoDocstring-green.svg
+   :target: https://marketplace.visualstudio.com/items?itemName=njpwerner.autodocstring
 
 DESReg
 ======
