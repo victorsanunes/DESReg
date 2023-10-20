@@ -1,11 +1,14 @@
 .. image:: https://img.shields.io/pypi/pyversions/scikit-learn.svg
-   :target: https://www.python.org
+    :target: https://www.python.org
+
 .. image:: https://img.shields.io/badge/repository-PyPI-brown.svg
-   :target: https://pypi.org/
+    :target: https://pypi.org
+
 .. image:: https://img.shields.io/badge/License-MIT-blue.svg
-   :target: https://opensource.org/license/mit
+    :target: https://opensource.org/license/mit
+
 .. image:: https://img.shields.io/badge/docs-autoDocstring-green.svg
-   :target: https://marketplace.visualstudio.com/items?itemName=njpwerner.autodocstring
+    :target: https://marketplace.visualstudio.com/items?itemName=njpwerner.autodocstring
 
 
 DESReg
@@ -99,7 +102,7 @@ Basis use of DESReg:
 Citation
 ---------
 
-If you use DESReg in a scientific paper, please consider citing the following paper:
+
 
 References:
 ---------
