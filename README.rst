@@ -1,9 +1,7 @@
 .. image:: https://img.shields.io/pypi/pyversions/scikit-learn.svg
    :target: https://www.python.org
-
 .. image:: https://img.shields.io/badge/License-MIT-blue.svg
    :target: https://opensource.org/license/mit
-
 .. image:: https://img.shields.io/badge/docs-autoDocstring-green.svg
    :target: https://marketplace.visualstudio.com/items?itemName=njpwerner.autodocstring
 
@@ -102,4 +100,4 @@ References:
 ---------
 .. [1] : R. M. O. Cruz, R. Sabourin, and G. D. Cavalcanti, “Dynamic classifier selection: Recent advances and perspectives,” Information Fusion, vol. 41, pp. 195 – 216, 2018.
 .. [2] : Thiago J.M. Moura and George D.C. Cavalcanti and Luiz S. Oliveira, "MINE: A framework for dynamic regressor selection",Information Sciences, vol. 543, pages 157-179, 2021.
-.. _scikit-learn: http://scikit-learn.org/stable/.. _scikit-learn: http://scikit-learn.org/stable/
+.. _scikit-learn: http://scikit-learn.org/stable/
