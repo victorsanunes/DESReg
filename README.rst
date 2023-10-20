@@ -6,8 +6,6 @@
    :target: https://opensource.org/license/mit
 .. image:: https://img.shields.io/badge/docs-autoDocstring-green.svg
    :target: https://marketplace.visualstudio.com/items?itemName=njpwerner.autodocstring
-.. image:: https://img.shields.io/pypi/status/ansicolortags.svg
-   :target: https://pypi.python.org/pypi/ansicolortags/
 
 
 DESReg
