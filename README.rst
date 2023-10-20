@@ -1,9 +1,14 @@
 .. image:: https://img.shields.io/pypi/pyversions/scikit-learn.svg
    :target: https://www.python.org
+.. image:: https://img.shields.io/badge/repository-PyPI-brown.svg
+   :target: https://pypi.org/
 .. image:: https://img.shields.io/badge/License-MIT-blue.svg
    :target: https://opensource.org/license/mit
 .. image:: https://img.shields.io/badge/docs-autoDocstring-green.svg
    :target: https://marketplace.visualstudio.com/items?itemName=njpwerner.autodocstring
+.. |PyPI status| image:: https://img.shields.io/pypi/status/ansicolortags.svg
+   :target: https://pypi.python.org/pypi/ansicolortags/
+
 
 DESReg
 ======
