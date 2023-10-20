@@ -1,8 +1,8 @@
 .. image:: https://img.shields.io/pypi/pyversions/scikit-learn.svg
-.. :target: https://pypi.org/project/scikit-learn/
+   :target: https://pypi.org/project/scikit-learn/
 
 .. image:: https://img.shields.io/badge/License-MIT-blue.svg
-    :target: https://opensource.org/license/mit/
+   :target: https://opensource.org/license/mit/
 
 DESReg
 ======
