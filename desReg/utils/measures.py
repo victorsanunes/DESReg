@@ -2,16 +2,13 @@ import numpy as np
 
 
 
-N_ERROR_MEASURES = 8   # method of error implemented, number of errors calculated from all_errors 
-
-### Measures to estimate errors of the regressors for measuring the level of competence
+### Measures to estimate errors of the regressors for calculating the level of competence
 def variance_error(y_pred):
-    """Calculates the variance of the DSEL predictions 
-
+    """
     Parameters
     ----------
     y_pred : array
-        actual output of samples from the competence region
+        predictions for samples in the competence region
 
     Returns
     -------
@@ -23,133 +20,126 @@ def variance_error(y_pred):
     return np.var(y_pred)
 
 def sum_absolute_error(y_true, y_pred, normalized_distances):
-    """_summary_
-
+    """
     Parameters
     ----------
     y_true : array
-        actual output of samples from the competence region
+        real output for samples in the competence region
     y_pred : array
-        output predictions of a regressor for the samples of the competence region
+        output predictions of a regressor for samples in the competence region
     normalized_distances : array
-        Inverse of the distance between the test sample and the samples in the competence region
+        Inverse of the normalized distance between the test sample and the samples in the competence region
 
     Returns
     -------
     real 
         The dot product between the absolute error and the normalized_distances
     """
-    return np.dot(np.abs(y_true - y_pred), normalized_distances) # sum_absolute_error
+    return np.dot(np.abs(y_true - y_pred), normalized_distances) 
 
-def sum_squared_error(y_true, y_pred, dists):
+def sum_squared_error(y_true, y_pred, normalized_distances):
 
-    """_summary_
-
+    """
     Parameters
     ----------
     y_true : array
-        actual output of samples from the competence region
+        real output for samples in the competence region
     y_pred : array
-        output predictions of a regressor for the samples of the competence region
+        output predictions of a regressor for samples in the competence region
     normalized_distances : array
-       Inverse of the distance between the test sample and the samples in the competence region
+       Inverse of the normalized distance between the test sample and the samples in the competence region
 
     Returns
     -------
     real
-        The dot product between the absolute error and the normalizeed_distances
+        The dot product between the square error and the normalizeed_distances
     """
 
-    return np.dot(np.square(y_true - y_pred), dists)  # sum square error
+    return np.dot(np.square(y_true - y_pred), normalized_distances)  
 
 def minimum_squared_error(y_true, y_pred, normalized_distances):
 
-    """_summary_
-
+    """
     Parameters
     ----------
     y_true : array
-        actual output of samples from the competence region
+        real output for samples in the competence region
     y_pred : array
-        output predictions of a regressor for the samples of the competence region
+        output predictions of a regressor for samples in the competence region
     normalized_distances : array
-       Inverse of the distance between the test sample and the samples in the competence region
+       Inverse of the normalized distance between the test sample and the samples in the competence region
 
     Returns
     -------
     real
-        The minimum square error of the product between the error and the normalizeed_distances
+        The minimum square error of the product between the error and the normalized_distances
     """
-    return np.min(np.multiply(np.square(y_true - y_pred), normalized_distances)) # minimum_square_error
+    return np.min(np.multiply(np.square(y_true - y_pred), normalized_distances)) 
 
 def maximum_squared_error(y_true, y_pred, normalized_distances):    
 
-    """_summary_
-
+    """
     Parameters
     ----------
     y_true : array
-        actual output of samples from the competence region
+        real output for samples in the competence region
     y_pred : array
-        output predictions of a regressor for the samples of the competence region
+        output predictions of a regressor for samples in the competence region
     normalized_distances : array
-       Inverse of the distance between the test sample and the samples in the competence region
+       Inverse of the normalized distance between the test sample and the samples in the competence region
 
     Returns
     -------
     real
-        The maximum square error of the product between the error and the normalizeed_distances
+        The maximum square error of the product between the error and the normalized_distances
     """
-    return np.max(np.multiply(np.square(y_true - y_pred), normalized_distances)) # maximum_square_error
+    return np.max(np.multiply(np.square(y_true - y_pred), normalized_distances)) 
                     
 def neighbors_similarity(y_true, normalized_distances, y_pred_test):   
-    """_summary_
-
+    """
     Parameters
     ----------
     y_true : array
-        actual output of samples from the competence region
+        real output for samples in the competence region
     normalized_distances : array
-       Inverse of the distance between the test sample and the samples in the competence region    
-    y_pred_test : array or real
-        output prediction/s of a regressor for the test sample
+       Inverse of the normalized distance between the test sample and the samples in the competence region    
+    y_pred_test : real
+        output prediction of a regressor for the test sample
     
     Returns
     -------
     real
         
     """ 
-    return np.dot(np.square(y_true - y_pred_test), normalized_distances) # neighbors similarity ????Se vuelve a invertir la distancia????
+    return np.dot(np.square(y_true - y_pred_test), normalized_distances) 
                    
 def root_sum_squared_error(y_true, y_pred, normalized_distances): 
-    """_summary_
-
+    """
     Parameters
     ----------
     y_true : array
-        actual output of samples from the competence region
+        real output for samples in the competence region
     y_pred : array
-        output predictions of a regressor for the samples of the competence region
+        output predictions of a regressor for samples in the competence region
     normalized_distances : array
-       Inverse of the distance between the test sample and the samples in the competence region
+       Inverse of the normalized distance between the test sample and the samples in the competence region
 
     Returns
     -------
     real 
         The dot product between the root mean square error and the normalizeed_distances
     """   
-    return np.sqrt(np.dot(np.square(y_true - y_pred), normalized_distances)) # root_sum_square_error
+    return np.sqrt(np.dot(np.square(y_true - y_pred), normalized_distances)) 
                     
-    # error in the nearest sample
-def nearest_squared_error(y_true, y_pred, dists):
-    """_summary_
-
+    
+def closest_squared_error(y_true, y_pred, dists):
+    """
     Parameters
     ----------
     y_true : array
-        actual output of samples from the competence region
+        real output for samples in the competence region
     y_pred : array
-        output predictions of a regressor for the samples of the competence region
+        output predictions of a regressor for samples in the competence region
     dists : array
        Distances between the test sample and the samples in the competence region
 
@@ -160,23 +150,22 @@ def nearest_squared_error(y_true, y_pred, dists):
     """ 
     p_min = np.where(dists == np.min(dists))
     p_min = p_min[0][0]  
-    return np.square(y_true[p_min] - y_pred[p_min])  # closest_square_error
+    return np.square(y_true[p_min] - y_pred[p_min])  
     
 def all_errors(y_true, y_pred, normalized_distances, dists, y_pred_test):
-    """_summary_
-
+    """
     Parameters
     ----------
     y_true : array
-        actual output of samples from the competence region
+        real output for samples in the competence region
     y_pred : array
-        output predictions of a regressor for the samples of the competence region
+        output predictions of a regressor for samples in the competence region
     normalized_distances : array
-       Inverse of the distance between the test sample and the samples in the competence region
+       Inverse of the normalized distance between the test sample and the samples in the competence region
     dists : array
        Distances between the test sample and the samples in the competence region
     y_pred_test : array or real
-       output prediction/s of a regressor for the test sample
+       output prediction of a regressor for the test sample
 
     Returns
     -------
@@ -191,19 +180,18 @@ def all_errors(y_true, y_pred, normalized_distances, dists, y_pred_test):
     errors = np.append(errors, maximum_squared_error(y_true, y_pred, normalized_distances))
     errors = np.append(errors, neighbors_similarity(y_true, normalized_distances, y_pred_test))             
     errors = np.append(errors, root_sum_squared_error(y_true, y_pred, normalized_distances))
-    errors = np.append(errors, nearest_squared_error(y_true, y_pred, dists))
+    errors = np.append(errors, closest_squared_error(y_true, y_pred, dists))
     return errors
       
 # Examples of functions that can be used as a method of aggregating predictions for the ensemble
 # Some of these measures can also be used as a thresholding method in the selection of regressors for the ensemble
 
 def mean_sd(a):
-    """Value obtained as the arithmetic mean plus the standard deviation of the input values
-
+    """
     Parameters
     ----------
     a : array
-        An array with the values for which the measure is to be calculated
+        An array with the values 
 
     Returns
     -------
@@ -217,16 +205,15 @@ def mean_sd(a):
 
 
 def max_min_2(a):
-
     """
     Parameters
     ----------
     a : array
-        An array with the values for which the measure is to be calculated
+        An array with the values 
 
     Returns
     -------
-    real: half of the sum of the minimum and maximum of the vector
+    real: half of the sum of the minimum and maximum of the values
          
     """
     max_value = np.max(a)
@@ -235,15 +222,14 @@ def max_min_2(a):
 
 def mean_min_2(a):
     """
-
     Parameters
     ----------
     a : array
-        An array with the values for which the measure is to be calculated
+        An array with the values 
 
     Returns
     -------
-    real: half of the sum of the minimum and the mean of the vector
+    real: half of the sum of the minimum and the mean of the values
         
     """   
     mean_value = np.mean(a)
@@ -251,18 +237,16 @@ def mean_min_2(a):
     return ((mean_value + min_value) /2)
 
 def geometric_mean(a):
-
-    """Calculates the geometric mean of the input values
-
+    """
     Parameters
     ----------
     a : array
-        An array with the values from which its geometric mean is to be calculated
+        An array with the values 
 
     Returns
     -------
     real:
-        The geometric mean of the values of a 
+        The geometric mean of the values  
     """
     p = 1
     for i in a:
@@ -270,20 +254,18 @@ def geometric_mean(a):
     return p**(1/len(a))
 
 def weighted_average(a, weights):  
-    
-    """Calculates the weighted average of the input values
-
+    """
     Parameters
     ----------
     a : array
-        An array with the values from which its weighted average is to be calculated
+        An array with the values 
     weights : array
-        An array whit the weights_
+        An array with the weights
 
     Returns
     -------
     real:
-        The weighted average of the values of a
+        The weighted average of the values
     """
     s = 0
     for i in range(0,len(a)):
