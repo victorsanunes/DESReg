@@ -1,6 +1,6 @@
 import numpy as np
 
-
+N_ERROR_MEASURES = 8  # number of errors calculated and used in all_errors method
 
 ### Measures to estimate errors of the regressors for calculating the level of competence
 def variance_error(y_pred):
