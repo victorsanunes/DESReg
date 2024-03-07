@@ -101,8 +101,23 @@ Basis use of DESReg:
 
 Citation
 ---------
+If you use DESReg in a scientific paper, please consider citing the following paper:
 
+M. D. Pérez-Godoy, M. Molina, F. Martínez, D. Elizondo b, F. Charte, A. J. Rivera. DESReg: Dynamic Ensemble Selection library for Regression tasks. Neurocomputing (2024). Volume 580
 
+.. code-block:: text
+
+	@article{PEREZGODOY2024127487,
+		title = {DESReg: Dynamic Ensemble Selection library for Regression tasks},
+		journal = {Neurocomputing},
+		volume = {580},
+		pages = {127487},
+		year = {2024},
+		issn = {0925-2312},
+		doi = {https://doi.org/10.1016/j.neucom.2024.127487},
+		url = {https://www.sciencedirect.com/science/article/pii/S0925231224002583},
+		author = {María D. Pérez-Godoy and Marta Molina and Francisco Martínez and David Elizondo and Francisco Charte and Antonio J. Rivera}
+	}	
 
 References:
 ---------
