@@ -54,7 +54,7 @@ The library can be installed using ``pip``:
 
 .. code-block:: bash
 
-    pip install DESreg
+    pip install DESReg
 
 
 Dependencies
