@@ -53,7 +53,7 @@ Installation:
 
 The library can be installed using ``pip``:
 
-.. code-block:: bash
+.. code:: bash
 
     pip install DESReg
 
@@ -75,7 +75,7 @@ Example
 -----------
 Basis use of DESReg:
 
-.. code-block:: python
+.. code:: python
 
 	from desReg.des.DESRegression import DESRegression
 	from desReg.dataset import load_Student_Mark
