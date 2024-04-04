@@ -31,7 +31,8 @@ The package includes two folders with the following contents:
 
 
 Parameters and configuration
-----------------
+-----------------------------
+
 The constructor method ``DESRegression`` accepts the following parameter to design a new DES methodology.
 
 - ``regressors_list:`` Accepts a list with the regressors that will be part of the ensemble. The pool of regressors is obtained by bagging each of the regressors in the list. The base regressors must support the ``predict`` method. If this list is not defined, the default regressor for bagging is the ``DecisionTreeRegressor``.
