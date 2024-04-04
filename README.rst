@@ -47,6 +47,7 @@ The constructor method ``DESRegression`` accepts the following parameter to desi
 - ``regressor_selection:`` Receives a method that calculates the selection threshold to choose the best regressors (with the best competence levels) from the pool. The arithmetic mean (``numpy.mean``) of the competence level regressors is used by default. In this manner, any regressor with a competence level below the threshold is selected. As for the above hyperparameters, the user can utilize other already implemented measures or implements its own measures.
 - ``aggregation_method:`` Given method for aggregating the predictions of the ensemble base regressors. 
 - ``ensemble_type:`` Determine the type of ensemble. Posible values are: DES (Dynamic Ensemble Selection), DSR (Dynamic Regressor Selecion), SE (Static Ensemble)
+
 Installation:
 -------------
 
