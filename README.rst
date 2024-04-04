@@ -120,6 +120,7 @@ Pérez-Godoy, M.D., Molina, M., Martínez, F., Elizondo, D., Charte, F., Rivera,
 		author = {María D. Pérez-Godoy and Marta Molina and Francisco Martínez and David Elizondo and Francisco Charte and Antonio J. Rivera}
 	}	
 
+
 References:
 ---------
 .. [1] R.M.O. Cruz, R. Sabourin, and G. D. Cavalcanti, "Dynamic classifier selection: Recent advances and perspectives" Information Fusion, vol. 41, pp. 195 – 216, 2018.
