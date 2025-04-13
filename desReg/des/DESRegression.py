@@ -344,7 +344,7 @@ class DESRegression(BaseEstimator):
 ###   Define the region of competence (DSEL: Dynamic Selection Dataset) ###
 ###########################################################################
 
-    def _competence_region_cluster(self, instance, meta_feature='feature_S2'):
+    def _competence_region_cluster(self, instance, meta_feature='instance_hardness'):
         """Calculate the region of competence using clustering
 
         Parameters
@@ -386,7 +386,7 @@ class DESRegression(BaseEstimator):
             dsel_sample_1d = self.DSEL_data_[idxs[i]].ravel()
             dists[i] = self.distance_(dsel_sample_1d, instance_1d)
             if self.include_instance_hardness:
-                ih_values[i] = ih_df.loc[idxs[i], 'normalized_inverse_instance_hardness']
+                ih_values[i] = ih_df.loc[idxs[i], meta_feature]
         return idxs, dists, ih_values
 
     def _competence_region_knn(self, instance):
@@ -502,7 +502,8 @@ class DESRegression(BaseEstimator):
         regressors_errors = np.empty((0, n_measures))
         
         competence_region = self.DSEL_data_[idxs]
-        # logger.info(f"Selected measures: {selected_measures}, n_measures: {n_measures}")
+        logger.info(f"Selected measures: {selected_measures}, n_measures: {n_measures}")
+        
         # Calculate normalized distances and weights
         dists[dists == 0] = 1e-10
         inverse_distances = 1.0 / dists
