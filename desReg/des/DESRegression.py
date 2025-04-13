@@ -15,7 +15,28 @@ from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial import distance
 
 import desReg.utils.measures as em
+from desReg.utils import instance_hardness as ih
 
+import logging
+
+# Create a custom logger
+logger = logging.getLogger(__name__)
+
+# Create handlers
+c_handler = logging.StreamHandler()
+f_handler = logging.FileHandler('desreg.log')
+c_handler.setLevel(logging.INFO)
+f_handler.setLevel(logging.ERROR)
+
+# Create formatters and add it to handlers
+c_format = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
+f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+c_handler.setFormatter(c_format)
+f_handler.setFormatter(f_format)
+
+# Add handlers to the logger
+logger.addHandler(c_handler)
+logger.addHandler(f_handler)
 
 MIN_NUMBER_INSTANCES = 5 # minimum number of instances in the dataset
 MIN_N_REGRESSORS_BAG = 2  # minimum number of estimators
@@ -28,9 +49,23 @@ class DESRegression(BaseEstimator):
        This class can also be use for building a Dynamic Regressor Selection (DRS) and a Static Ensemble (SE)
     """
 
-    def __init__(self, regressors_list=None, n_estimators_bag=10, random_state=None, DSEL_perc=0.5, XTRAIN_full=True, n_jobs=-1,
-                    k=5, distance = distance.euclidean, competence_region='knn', competence_level= em.all_errors, regressor_selection=np.mean, 
-                    aggregation_method=np.mean, ensemble_type='DES'):   
+    def __init__(
+        self, 
+        regressors_list=None, 
+        n_estimators_bag=10, 
+        random_state=None, 
+        DSEL_perc=0.5, 
+        XTRAIN_full=True, 
+        n_jobs=-1,
+        k=5, 
+        distance = distance.euclidean, 
+        competence_region='knn', 
+        competence_level= em.all_errors, 
+        regressor_selection=np.mean, 
+        aggregation_method=np.mean, 
+        ensemble_type='DES',
+        include_instance_hardness=True
+    ):   
               
         """
            Constructor method
@@ -100,6 +135,7 @@ class DESRegression(BaseEstimator):
         self.regressor_selection = regressor_selection
         self.aggregation_method = aggregation_method
         self.ensemble_type = ensemble_type
+        self.include_instance_hardness = include_instance_hardness
         
   
     def _set_dsel(self, X, y):
@@ -195,7 +231,6 @@ class DESRegression(BaseEstimator):
         else:
             self.competence_region_ = self.competence_region
                 
-        type(self.competence_level)
         if (type(self.competence_level) is not list):
             self.competence_level = [self.competence_level]
         for func in self.competence_level:
@@ -309,8 +344,7 @@ class DESRegression(BaseEstimator):
 ###   Define the region of competence (DSEL: Dynamic Selection Dataset) ###
 ###########################################################################
 
-    def _competence_region_cluster(self, instance):
-        
+    def _competence_region_cluster(self, instance, meta_feature='feature_S2'):
         """Calculate the region of competence using clustering
 
         Parameters
@@ -322,26 +356,38 @@ class DESRegression(BaseEstimator):
         -------
         array of int:
             Indices of the DSEL samples forming the region of competence
-
         array of real:
             Distances between instance and the samples in the region of competence    
+        array of real:
+            Instance hardness values for the samples in the region of competence
         """
+        # Ensure instance is 2D for KMeans prediction
+        instance_2d = instance.reshape(1, -1)
         
         self.clustering_ = KMeans(n_clusters=self.k_, random_state=self.random_state_)  
-
         self.clustering_.fit(self.DSEL_data_)
-        
-        clust = self.clustering_.predict(instance)
+        if self.include_instance_hardness:
+            ih_df = ih.get_instance_hardness(self.DSEL_data_, self.DSEL_target_)
+
+        clust = self.clustering_.predict(instance_2d)
         idxs = []
         for i in range(0, len(self.DSEL_data_)):
             if self.clustering_.predict(self.DSEL_data_[i].reshape(1, -1)) == clust:
                 idxs.append(i)
         
         dists = np.zeros(len(idxs))
+        ih_values = np.zeros(len(idxs))
+        
+        # Ensure instance is 1D for distance calculation
+        instance_1d = instance.ravel()
+        
         for i in range(0, len(idxs)):
-            dists[i] = self.distance_(self.DSEL_data_[idxs[i]], instance)
-
-        return idxs, dists
+            # Ensure DSEL sample is 1D for distance calculation
+            dsel_sample_1d = self.DSEL_data_[idxs[i]].ravel()
+            dists[i] = self.distance_(dsel_sample_1d, instance_1d)
+            if self.include_instance_hardness:
+                ih_values[i] = ih_df.loc[idxs[i], 'normalized_inverse_instance_hardness']
+        return idxs, dists, ih_values
 
     def _competence_region_knn(self, instance):
         
@@ -427,10 +473,9 @@ class DESRegression(BaseEstimator):
 ###    Calculating the level of competence of the base regressors  ###
 ######################################################################
     
-    def _calculate_competence_level(self, idxs, dists, instance):
-        
+    def _calculate_competence_level(self, idxs, dists, instance, ih_values=None):
         """Calculate the competence level of each regressor 
-        in the pool for the given test sample
+        in the pool for the given test sample, with support for both normalized distances and weights
 
         Parameters
         ----------
@@ -447,9 +492,8 @@ class DESRegression(BaseEstimator):
         -------
         array of real
             Competence level of each regressor in the pool for the given test sample
-
         """
-               
+        
         selected_measures = self.competence_level_
         n_measures = len(selected_measures)
         if em.all_errors in self.competence_level_:
@@ -458,33 +502,43 @@ class DESRegression(BaseEstimator):
         regressors_errors = np.empty((0, n_measures))
         
         competence_region = self.DSEL_data_[idxs]
+        # logger.info(f"Selected measures: {selected_measures}, n_measures: {n_measures}")
+        # Calculate normalized distances and weights
         dists[dists == 0] = 1e-10
         inverse_distances = 1.0 / dists
         sum_inverse_distances = np.sum(inverse_distances)
         normalized_distances = inverse_distances/sum_inverse_distances
-        
+        weights = ih_values
+
         y_true = self.DSEL_target_[idxs]
         for reg in self.regressors_list_:
             errors = []
             y_pred = reg.predict(competence_region)
-            y_pred_test = reg.predict(instance) 
+            y_pred_test = reg.predict(instance)
+            
             for func in selected_measures:
                 params = signature(func).parameters
-               
+                
+                # Build parameters dict including both normalized_distances and weights
                 l = []
-                for param in params: 
-                    if param in locals():
-                        l.append((param,locals()[param]))
-                wargsk = dict(l) 
-                error = func(**wargsk)   
+                # logger.info(f"Parameters: {params}")
+                for param in params:
+                    if param == 'weights':
+                        l.append((param, weights))
+                    elif param == 'normalized_distances':
+                        l.append((param, normalized_distances))
+                    elif param in locals():
+                        l.append((param, locals()[param]))
+                wargsk = dict(l)
+                error = func(**wargsk)
                 
                 errors = np.append(errors, error)
-            regressors_errors = np.append(regressors_errors, [errors], axis = 0)
+            regressors_errors = np.append(regressors_errors, [errors], axis=0)
         
         scaler = MinMaxScaler()
         regressors_errors = scaler.fit_transform(regressors_errors)
 
-        competence_levels = np.mean(regressors_errors, axis = 1) 
+        competence_levels = np.mean(regressors_errors, axis=1)
         return competence_levels
    
 ###########################################################
@@ -607,7 +661,6 @@ class DESRegression(BaseEstimator):
 ###########################################################
     
     def predict(self, X, params=None):
-
         """Calculate sample predictions using Dinamic Ensemble Selection
 
         Parameters
@@ -638,7 +691,7 @@ class DESRegression(BaseEstimator):
         return y_pred  
 
     def _predict_DES(self, X):
-
+        # breakpoint()
         """Calculate sample predictions using Dinamic Ensemble Selection
 
         Parameters
@@ -657,8 +710,10 @@ class DESRegression(BaseEstimator):
 
             name_func = '_competence_region_' + self.competence_region_  
             func = getattr(self, name_func)
-            idxs, dists  = func(instance)             
-            competence_levels = self._calculate_competence_level(idxs, dists, instance)
+            
+            idxs, dists, ih_values = func(instance)
+                      
+            competence_levels = self._calculate_competence_level(idxs, dists, instance, ih_values)
             selected_regressors, selected_competence_levels = self._select_regressors_DES(competence_levels) 
             ensemble = selected_regressors
             predicted_output = self._aggregation(ensemble, instance, selected_competence_levels) 
@@ -717,4 +772,62 @@ class DESRegression(BaseEstimator):
         y_pred = np.mean(predictions, axis = 0)
         
         return y_pred
+    
+
+class CustomWeightDESRegression(DESRegression):
+    def __init__(self, custom_weights, **kwargs):
+        super().__init__(**kwargs)
+        self.custom_weights = custom_weights
+        
+    def _calculate_competence_level(self, idxs, dists, instance):
+        """Calculate the competence level using custom weights for each instance"""
+        selected_measures = self.competence_level_
+        n_measures = len(selected_measures)
+        if em.all_errors in self.competence_level_:
+            n_measures = n_measures + em.N_ERROR_MEASURES -1
+
+        regressors_errors = np.empty((0, n_measures))
+        
+        competence_region = self.DSEL_data_[idxs]
+        
+        # Get custom weights for the selected indices
+        instance_weights = self.custom_weights[idxs]
+        # Normalize the weights
+        weights = instance_weights / np.sum(instance_weights)
+        
+        # Keep normalized_distances for backward compatibility
+        dists[dists == 0] = 1e-10
+        inverse_distances = 1.0 / dists
+        sum_inverse_distances = np.sum(inverse_distances)
+        normalized_distances = inverse_distances/sum_inverse_distances
+        
+        y_true = self.DSEL_target_[idxs]
+        for reg in self.regressors_list_:
+            errors = []
+            y_pred = reg.predict(competence_region)
+            y_pred_test = reg.predict(instance)
+            
+            for func in selected_measures:
+                params = signature(func).parameters
+                
+                l = []
+                for param in params:
+                    if param == 'weights':
+                        l.append((param, weights))
+                    elif param == 'normalized_distances':
+                        l.append((param, normalized_distances))
+                    elif param in locals():
+                        l.append((param, locals()[param]))
+                wargsk = dict(l)
+                error = func(**wargsk)
+                
+                errors = np.append(errors, error)
+            regressors_errors = np.append(regressors_errors, [errors], axis=0)
+        
+        scaler = MinMaxScaler()
+        regressors_errors = scaler.fit_transform(regressors_errors)
+
+        competence_levels = np.mean(regressors_errors, axis=1)
+        return competence_levels
+
     
