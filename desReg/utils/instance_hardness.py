@@ -3,11 +3,30 @@ from pyhard.measures import RegressionMeasures
 from pyhard.regression import RegressorsPool
 import numpy as np
 import logging
+from sklearn.neighbors import NearestNeighbors
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+measures_dict = {
+    'C4': 'collective_feature_efficiency',
+    'L1': 'linear_absolute_error',
+    'S1': 'output_distribution',
+    'S2': 'input_distribution',
+    'S3': 'error_nn_regressor',
+    'FO': 'feature_outlier',
+    'POT': 'target_outlier',
+    'HB': 'histogram_bin',
+    'EDS': 'stump_error',
+    'EZR': 'zero_rule_error',
+    'DS': 'disjunct_size',
+    'TD_P': 'tree_depth_pruned',
+    'TD_U': 'tree_depth_unpruned',
+    'D': 'density',
+    'CC': 'clustering_coefficient'
+}
 
 def build_pyhard_df(X, y):
     df = pd.DataFrame(X)
@@ -35,44 +54,86 @@ def consolidate_data(*dataframes):
 
 def compute_regression_measures(df: dict, measures_list: list = None) -> tuple:
     if not measures_list:
-        measures_dict = {
-            'C4': 'collective_feature_efficiency',
-            'L1': 'linear_absolute_error',
-            'S1': 'output_distribution',
-            'S2': 'input_distribution',
-            'S3': 'error_nn_regressor',
-            'FO': 'feature_outlier',
-            'POT': 'target_outlier',
-            'HB': 'histogram_bin',
-            'EDS': 'stump_error',
-            'EZR': 'zero_rule_error',
-            'DS': 'disjunct_size',
-            'TD_P': 'tree_depth_pruned',
-            'TD_U': 'tree_depth_unpruned',
-            'D': 'density',
-            'CC': 'clustering_coefficient'
-        }
         measures_list = list(measures_dict.keys())
     
     df_ = df.copy()
     regression_measures = RegressionMeasures(df_)
     
-    # Create a custom wrapper for error_nn_regressor to handle shape mismatch
+    # Create a custom implementation of error_nn_regressor to fix the shape mismatch
     original_error_nn_regressor = regression_measures.error_nn_regressor
     
-    def safe_error_nn_regressor(n_neighbors=5):
+    def fixed_error_nn_regressor(n_neighbors=5):
         try:
-            return original_error_nn_regressor(n_neighbors)
-        except ValueError as e:
-            if "operands could not be broadcast together" in str(e):
-                logger.warning(f"Shape mismatch in error_nn_regressor: {str(e)}")
-                # Return a default value for all instances
-                return np.ones(len(df_)) * 0.5
-            else:
-                raise
+            # Get the distance matrix
+            dist_matrix = regression_measures.dist_matrix_gower
+            
+            # Create a NearestNeighbors object with the distance matrix
+            nn = NearestNeighbors(n_neighbors=n_neighbors+1, metric='precomputed').fit(dist_matrix)
+            
+            # Get the indices of the k+1 nearest neighbors (including self)
+            distances, indices = nn.kneighbors(dist_matrix)
+            
+            # Remove the first neighbor (self)
+            indices = indices[:, 1:]
+            
+            # Calculate the mean of the target values for the k nearest neighbors
+            nn_y_avg = np.array([np.mean(regression_measures.y_scaled[indices[i]]) for i in range(len(indices))])
+            
+            # Calculate the squared error
+            S3 = (nn_y_avg - regression_measures.y_scaled) ** 2
+            
+            # Normalize and return
+            return 1 - np.exp(-S3 / S3.std())
+        except Exception as e:
+            logger.error(f"Error in fixed_error_nn_regressor: {str(e)}")
+            # Return a default value for all instances
+            return np.ones(len(df_)) * 0.5
     
-    # Replace the method with our safe version
-    regression_measures.error_nn_regressor = safe_error_nn_regressor
+    # Alternative implementation that processes the flattened array correctly
+    def alternative_error_nn_regressor(n_neighbors=5):
+        try:
+            # Get the distance matrix
+            dist_matrix = regression_measures.dist_matrix_gower
+            
+            # Create a NearestNeighbors object with the distance matrix
+            nn = NearestNeighbors(n_neighbors=n_neighbors+1, metric='precomputed').fit(dist_matrix)
+            
+            # Get the sparse matrix representation
+            nn_arr = nn.kneighbors_graph(mode='distance').toarray()
+            
+            # Get the row and column indices of non-zero elements
+            rows, cols = np.nonzero(nn_arr)
+            
+            # Create a dictionary to store neighbors for each instance
+            instance_neighbors = {}
+            for i in range(len(df_)):
+                instance_neighbors[i] = []
+            
+            # Group neighbors by instance
+            for i, j in zip(rows, cols):
+                if i != j:  # Skip self
+                    instance_neighbors[i].append(j)
+            
+            # Calculate the mean of the target values for each instance's neighbors
+            nn_y_avg = np.zeros(len(df_))
+            for i in range(len(df_)):
+                if instance_neighbors[i]:  # If there are neighbors
+                    nn_y_avg[i] = np.mean(regression_measures.y_scaled[instance_neighbors[i]])
+                else:  # If no neighbors (shouldn't happen with n_neighbors+1)
+                    nn_y_avg[i] = regression_measures.y_scaled[i]
+            
+            # Calculate the squared error
+            S3 = (nn_y_avg - regression_measures.y_scaled) ** 2
+            
+            # Normalize and return
+            return 1 - np.exp(-S3 / S3.std())
+        except Exception as e:
+            logger.error(f"Error in alternative_error_nn_regressor: {str(e)}")
+            # Return a default value for all instances
+            return np.ones(len(df_)) * 0.5
+    
+    # Replace the method with our fixed version
+    # regression_measures.error_nn_regressor = alternative_error_nn_regressor
     
     # Calculate all measures
     regression_measures_df = regression_measures.calculate_all(measures_list=measures_list)
