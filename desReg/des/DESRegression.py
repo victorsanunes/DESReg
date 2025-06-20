@@ -264,7 +264,12 @@ class DESRegression(BaseEstimator):
         else:
             self.ensemble_type_ = self.ensemble_type
         
-
+        # Validate that hardness values are calculated during training if needed
+        if self.include_instance_hardness and not hasattr(self, 'instance_hardness_df'):
+            raise ValueError("Instance hardness values must be calculated during training. Call fit() before predict().")
+        
+        if self.include_hardness_measures and not hasattr(self, 'hardness_measures_df'):
+            raise ValueError("Hardness measures must be calculated during training. Call fit() before predict().")
 
     def fit(self, X, y):   
         """Fit the model with the given parameters. First, validate some parameters such as the DSEL_perc, n_estimators_bag and then
@@ -316,18 +321,44 @@ class DESRegression(BaseEstimator):
         if self.XTRAIN_full == True:  
             X_train = X
             y_train = y    
-        # TODO: uncomment
-        # if self.include_hardness_measures:
-        #     logger.info(f"Calculating hardness measures for {self.hardness_measures_list}")
-        #     self.hardness_measures_df = ih.get_hardness_measures(
-        #         X=X_train, 
-        #         y=y_train, 
-        #         measures_list=self.hardness_measures_list
-        #     )
-        # if self.include_instance_hardness:
-        #     logger.info(f"Calculating instance hardness")
-        #     self.instance_hardness_df = ih.get_instance_hardness(X_train, y_train)  
 
+        if self.include_hardness_measures:
+            logger.info(f"Calculating hardness measures for {self.hardness_measures_list}")
+            # breakpoint
+            self.hardness_measures_df = ih.get_hardness_measures(
+                X=X_train, 
+                y=y_train, 
+                measures_list=self.hardness_measures_list
+            )
+            
+            # Validate meta_feature
+            if self.meta_feature not in self.hardness_measures_df.columns:
+                available_features = list(self.hardness_measures_df.columns)
+                logger.warning(f"Meta feature '{self.meta_feature}' not found in hardness measures. Available features: {available_features}")
+                # Use the first available feature as fallback
+                if available_features:
+                    self.meta_feature = available_features[0]
+                    logger.info(f"Using '{self.meta_feature}' as meta feature instead")
+                else:
+                    logger.warning("No hardness measures available. Disabling hardness measures.")
+                    self.include_hardness_measures = False
+        
+        if self.include_instance_hardness:
+            logger.info("Calculating instance hardness")
+            self.instance_hardness_df = ih.get_instance_hardness(X_train, y_train)
+            
+            # Validate meta_feature for instance hardness
+            if self.meta_feature not in self.instance_hardness_df.columns:
+                available_features = list(self.instance_hardness_df.columns)
+                logger.warning(f"Meta feature '{self.meta_feature}' not found in instance hardness. Available features: {available_features}")
+                # Use the first available feature as fallback
+                if available_features:
+                    self.meta_feature = available_features[0]
+                    logger.info(f"Using '{self.meta_feature}' as meta feature instead")
+                else:
+                    logger.warning("No instance hardness available. Disabling instance hardness.")
+                    self.include_instance_hardness = False
+        
         if  self.n_estimators_bag < MIN_N_REGRESSORS_BAG:
             raise ValueError("Number of estimators_bag must be at least ", MIN_N_REGRESSORS_BAG)
         else:
@@ -381,40 +412,43 @@ class DESRegression(BaseEstimator):
         # Ensure instance is 2D for KMeans prediction
         instance_2d = instance.reshape(1, -1)
         
-        self.clustering_ = KMeans(n_clusters=self.k_, random_state=self.random_state_)  
+        # Create and fit a K-means clustering model
+        self.clustering_ = KMeans(
+            n_clusters=self.k_, 
+            random_state=self.random_state_
+        )  
         self.clustering_.fit(self.DSEL_data_)
-        if self.include_hardness_measures:
-            logger.info(f"Calculating hardness measures for {self.hardness_measures_list}")
-            hardness_measures_df = ih.get_hardness_measures(
-                X=self.DSEL_data_, 
-                y=self.DSEL_target_, 
-                measures_list=self.hardness_measures_list
-            )
-        if self.include_instance_hardness:
-            logger.info(f"Calculating instance hardness for {self.meta_feature}")
-            ih_df = ih.get_instance_hardness(self.DSEL_data_, self.DSEL_target_)
-
+        
+        # Predict the cluster of the test instance
         clust = self.clustering_.predict(instance_2d)
+        
+        # Find all instances in the same cluster
         idxs = []
         for i in range(0, len(self.DSEL_data_)):
             if self.clustering_.predict(self.DSEL_data_[i].reshape(1, -1)) == clust:
                 idxs.append(i)
         
+        # Initialize arrays for distances and hardness values
         dists = np.zeros(len(idxs))
         ih_values = np.zeros(len(idxs))
         hardness_values = np.zeros(len(idxs))
         
-        # Ensure instance is 1D for distance calculation
+        # Calculate distances
         instance_1d = instance.ravel()
-        
         for i in range(0, len(idxs)):
-            # Ensure DSEL sample is 1D for distance calculation
             dsel_sample_1d = self.DSEL_data_[idxs[i]].ravel()
             dists[i] = self.distance_(dsel_sample_1d, instance_1d)
-            if self.include_instance_hardness:
-                ih_values[i] = ih_df.loc[idxs[i], self.meta_feature]
-            if self.include_hardness_measures:
-                hardness_values[i] = hardness_measures_df.loc[idxs[i], self.meta_feature]
+        
+        # Use pre-calculated instance hardness values if available
+        if self.include_instance_hardness and hasattr(self, 'instance_hardness_df'):
+            for i, idx in enumerate(idxs):
+                ih_values[i] = self.instance_hardness_df.loc[idx, self.meta_feature]
+        
+        # Use pre-calculated hardness measures if available
+        if self.include_hardness_measures and hasattr(self, 'hardness_measures_df'):
+            for i, idx in enumerate(idxs):
+                hardness_values[i] = self.hardness_measures_df.loc[idx, self.meta_feature]
+        
         return idxs, dists, ih_values, hardness_values
 
     def _competence_region_knn(self, instance):
@@ -439,8 +473,18 @@ class DESRegression(BaseEstimator):
             Hardness measure values for the samples in the region of competence
         """
 
-        self.knn_= KNeighborsRegressor(n_neighbors=self.k_, algorithm='auto', metric = self.distance_, n_jobs=self.n_jobs_).fit(self.DSEL_data_, self.DSEL_target_)
-        dists, idxs = self.knn_.kneighbors(instance, n_neighbors=self.k_, return_distance=True)  # por defecto metric='minkowski'??????
+        self.knn_ = KNeighborsRegressor(
+            n_neighbors=self.k_, 
+            algorithm='auto', 
+            metric=self.distance_, 
+            n_jobs=self.n_jobs_
+        ).fit(self.DSEL_data_, self.DSEL_target_)
+        
+        dists, idxs = self.knn_.kneighbors(
+            instance, 
+            n_neighbors=self.k_, 
+            return_distance=True
+        )
         
         idxs = idxs.reshape(-1)
         dists = dists.reshape(-1)
@@ -449,24 +493,23 @@ class DESRegression(BaseEstimator):
         ih_values = np.zeros(len(idxs))
         hardness_values = np.zeros(len(idxs))
         
-        # Calculate instance hardness if needed
-        if self.include_instance_hardness:
-            logger.info(f"Calculating instance hardness for {self.meta_feature}")
-            ih_df = ih.get_instance_hardness(self.DSEL_data_, self.DSEL_target_)
-            for i, idx in enumerate(idxs):
-                ih_values[i] = ih_df.loc[idx, self.meta_feature]
+        # Use pre-calculated instance hardness values if available
+        if self.include_instance_hardness and hasattr(self, 'instance_hardness_df'):
+            try:
+                for i, idx in enumerate(idxs):
+                    ih_values[i] = self.instance_hardness_df.loc[idx, self.meta_feature]
+            except KeyError:
+                logger.warning(f"Meta feature '{self.meta_feature}' not found in instance hardness. Using zeros instead.")
+                ih_values = np.zeros(len(idxs))
                 
-        # Calculate hardness measures if needed
-        if self.include_hardness_measures:
-            logger.info(f"Calculating hardness measures for {self.hardness_measures_list}")
-            logger.info(f"Selected hardness measure {self.meta_feature}")
-            hardness_measures_df = ih.get_hardness_measures(
-                X=self.DSEL_data_, 
-                y=self.DSEL_target_, 
-                measures_list=self.hardness_measures_list
-            )
-            for i, idx in enumerate(idxs):
-                hardness_values[i] = hardness_measures_df.loc[idx, self.meta_feature]
+        # Use pre-calculated hardness measures if available
+        if self.include_hardness_measures and hasattr(self, 'hardness_measures_df'):
+            try:
+                for i, idx in enumerate(idxs):
+                    hardness_values[i] = self.hardness_measures_df.loc[idx, self.meta_feature]
+            except KeyError:
+                logger.warning(f"Meta feature '{self.meta_feature}' not found in hardness measures. Using zeros instead.")
+                hardness_values = np.zeros(len(idxs))
                      
         return idxs, dists, ih_values, hardness_values
 
@@ -494,25 +537,25 @@ class DESRegression(BaseEstimator):
             Hardness measure values for the samples in the region of competence
         """
 
-        
-        output_profile_instance = []
-
+        # Get predictions for all instances in DSEL
         self.pred_DSEL_ = self._predict_base(self.DSEL_data_)
                
+        # Get predictions for the test instance
+        output_profile_instance = []
         for regressor in self.regressors_list_:
             output_profile_instance.append(regressor.predict(instance))
 
+        # Calculate similarity between test instance and DSEL instances
         idxs = []
         idx_count = 0
-    
         similarity_vector = np.zeros(len(self.pred_DSEL_))
 
         for dsel_idx in self.pred_DSEL_:  
             similarity = self.distance_(dsel_idx, output_profile_instance)
-
             similarity_vector[idx_count] = similarity
             idx_count += 1
 
+        # Select instances with similarity below the mean
         umbral = np.mean(similarity_vector)
         idx_count = 0
         for similarity in similarity_vector:
@@ -520,31 +563,24 @@ class DESRegression(BaseEstimator):
                 idxs.append(idx_count)
             idx_count += 1
 
+        # Calculate distances
         dists = np.zeros(len(idxs))           
         for i in range(0, len(idxs)):
             dists[i] = self.distance_(self.DSEL_data_[idxs[i]], instance)
         
-        # Initialize empty arrays for instance hardness and hardness measures
+        # Initialize arrays for hardness values
         ih_values = np.zeros(len(idxs))
         hardness_values = np.zeros(len(idxs))
         
-        # Calculate instance hardness if needed
-        if self.include_instance_hardness:
-            logger.info(f"Calculating instance hardness for {self.meta_feature}")
-            ih_df = ih.get_instance_hardness(self.DSEL_data_, self.DSEL_target_)
+        # Use pre-calculated instance hardness values if available
+        if self.include_instance_hardness and hasattr(self, 'instance_hardness_df'):
             for i, idx in enumerate(idxs):
-                ih_values[i] = ih_df.loc[idx, self.meta_feature]
+                ih_values[i] = self.instance_hardness_df.loc[idx, self.meta_feature]
                 
-        # Calculate hardness measures if needed
-        if self.include_hardness_measures:
-            logger.info(f"Calculating hardness measures for {self.hardness_measures_list}")
-            hardness_measures_df = ih.get_hardness_measures(
-                X=self.DSEL_data_, 
-                y=self.DSEL_target_, 
-                measures_list=self.hardness_measures_list
-            )
+        # Use pre-calculated hardness measures if available
+        if self.include_hardness_measures and hasattr(self, 'hardness_measures_df'):
             for i, idx in enumerate(idxs):
-                hardness_values[i] = hardness_measures_df.loc[idx, self.meta_feature]
+                hardness_values[i] = self.hardness_measures_df.loc[idx, self.meta_feature]
         
         return idxs, dists, ih_values, hardness_values
 
@@ -853,61 +889,42 @@ class DESRegression(BaseEstimator):
         
         return y_pred
     
+    def get_available_meta_features(self):
+        """Return the available meta features for instance hardness and hardness measures."""
+        available_features = {}
+        
+        if hasattr(self, 'instance_hardness_df'):
+            available_features['instance_hardness'] = list(self.instance_hardness_df.columns)
+        
+        if hasattr(self, 'hardness_measures_df'):
+            available_features['hardness_measures'] = list(self.hardness_measures_df.columns)
+        
+        return available_features
 
-# class CustomWeightDESRegression(DESRegression):
-#     def __init__(self, custom_weights, **kwargs):
-#         super().__init__(**kwargs)
-#         self.custom_weights = custom_weights
+    def set_meta_feature(self, meta_feature):
+        """Set the meta feature to use for instance hardness or hardness measures."""
+        if self.include_instance_hardness and hasattr(self, 'instance_hardness_df'):
+            if meta_feature in self.instance_hardness_df.columns:
+                self.meta_feature = meta_feature
+                logger.info(f"Meta feature set to '{meta_feature}' for instance hardness")
+            else:
+                available_features = list(self.instance_hardness_df.columns)
+                logger.warning(f"Meta feature '{meta_feature}' not found in instance hardness. Available features: {available_features}")
+                if available_features:
+                    self.meta_feature = available_features[0]
+                    logger.info(f"Using '{self.meta_feature}' as meta feature instead")
         
-#     def _calculate_competence_level(self, idxs, dists, instance):
-#         """Calculate the competence level using custom weights for each instance"""
-#         selected_measures = self.competence_level_
-#         n_measures = len(selected_measures)
-#         if em.all_errors in self.competence_level_:
-#             n_measures = n_measures + em.N_ERROR_MEASURES -1
-
-#         regressors_errors = np.empty((0, n_measures))
+        if self.include_hardness_measures and hasattr(self, 'hardness_measures_df'):
+            if meta_feature in self.hardness_measures_df.columns:
+                self.meta_feature = meta_feature
+                logger.info(f"Meta feature set to '{meta_feature}' for hardness measures")
+            else:
+                available_features = list(self.hardness_measures_df.columns)
+                logger.warning(f"Meta feature '{meta_feature}' not found in hardness measures. Available features: {available_features}")
+                if available_features:
+                    self.meta_feature = available_features[0]
+                    logger.info(f"Using '{self.meta_feature}' as meta feature instead")
         
-#         competence_region = self.DSEL_data_[idxs]
-        
-#         # Get custom weights for the selected indices
-#         instance_weights = self.custom_weights[idxs]
-#         # Normalize the weights
-#         weights = instance_weights / np.sum(instance_weights)
-        
-#         # Keep normalized_distances for backward compatibility
-#         dists[dists == 0] = 1e-10
-#         inverse_distances = 1.0 / dists
-#         sum_inverse_distances = np.sum(inverse_distances)
-#         normalized_distances = inverse_distances/sum_inverse_distances
-        
-#         y_true = self.DSEL_target_[idxs]
-#         for reg in self.regressors_list_:
-#             errors = []
-#             y_pred = reg.predict(competence_region)
-#             y_pred_test = reg.predict(instance)
-            
-#             for func in selected_measures:
-#                 params = signature(func).parameters
-                
-#                 l = []
-#                 for param in params:
-#                     if param == 'weights':
-#                         l.append((param, weights))
-#                     elif param == 'normalized_distances':
-#                         l.append((param, normalized_distances))
-#                     elif param in locals():
-#                         l.append((param, locals()[param]))
-#                 wargsk = dict(l)
-#                 error = func(**wargsk)
-                
-#                 errors = np.append(errors, error)
-#             regressors_errors = np.append(regressors_errors, [errors], axis=0)
-        
-#         scaler = MinMaxScaler()
-#         regressors_errors = scaler.fit_transform(regressors_errors)
-
-#         competence_levels = np.mean(regressors_errors, axis=1)
-#         return competence_levels
+        return self.meta_feature
 
     
