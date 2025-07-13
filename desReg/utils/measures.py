@@ -37,6 +37,25 @@ def sum_absolute_error(y_true, y_pred, normalized_distances):
     """
     return np.dot(np.abs(y_true - y_pred), normalized_distances) 
 
+def sum_absolute_error_weighted(y_true, y_pred, weights):
+    """
+    Parameters
+    ----------
+    y_true : array
+        real output for samples in the competence region
+    y_pred : array
+        output predictions of a regressor for samples in the competence region
+    normalized_distances : array
+        Inverse of the normalized distance between the test sample and the samples in the competence region
+
+    Returns
+    -------
+    real 
+        The dot product between the absolute error and the normalized_distances
+    """
+    return np.dot(np.abs(y_true - y_pred), weights) 
+
+
 def sum_squared_error(y_true, y_pred, normalized_distances):
 
     """
@@ -151,7 +170,29 @@ def closest_squared_error(y_true, y_pred, dists):
     p_min = np.where(dists == np.min(dists))
     p_min = p_min[0][0]  
     return np.square(y_true[p_min] - y_pred[p_min])  
-    
+
+
+def custom_weighted_error(y_true, y_pred, weights):
+    """
+    Parameters
+    ----------
+    y_true : array
+        real output for samples in the competence region
+    y_pred : array
+        output predictions of a regressor for samples in the competence region
+    normalized_distances : array
+        (unused) kept for compatibility with DESRegression signature
+    custom_weights : array
+        Custom weights for each sample in the competence region
+
+    Returns
+    -------
+    real
+        The weighted average error using custom weights
+    """
+    return np.dot(y_true - y_pred, weights)
+
+
 def all_errors(y_true, y_pred, normalized_distances, dists, y_pred_test):
     """
     Parameters

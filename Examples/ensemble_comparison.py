@@ -1,84 +1,138 @@
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
+warnings.filterwarnings('ignore', message='The default value of `dual` will change')
+
 from desReg.des.DESRegression import DESRegression
+from desReg.utils import measures as em
 
 import numpy as np
 import pandas as pd
-
+import datetime as dt
 from sklearn.svm import SVR
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn import linear_model
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_absolute_percentage_error
 
 #Three kind of ensembles (DES, DRE and SE) are compared. With this aim, 5 fold cross validation and nine datasets are used.
 
+partitions_dict = {
+    # 'abalone': './Datasets/Abalone/abalone-5-',
+    # 'concrete': './Datasets/Concrete/concrete-5-',
+    # 'liver': './Datasets/Liver/liver-5-',
+    # 'machineCPU': './Datasets/MachineCPU/machineCPU-5-',
+    # 'real_estate': './Datasets/Real_estate/Real_estate-5-',
+    'student_marks': './Datasets/Student_marks/student_marks-5-',
+    'wine_quality_red': './Datasets/Wine_quality_red/winequality-red-5-',
+    'wine_quality_white': './Datasets/Wine_quality_white/winequality-white-5-',
+    'yacht': './Datasets/Yacht/yacht_hydrodynamics-5-'
+}
 
-ensemble = DESRegression(regressors_list = [linear_model.Lasso(), linear_model.Ridge(), KNeighborsRegressor(), 
-                                             SVR(), DecisionTreeRegressor()], n_estimators_bag=20, random_state=0)
+# Create empty DataFrame to store results
+results = pd.DataFrame(columns=['Dataset', 'Method', 'Fold', 'MSE', 'R2', 'MAE', 'RMSE', 'MAPE'])
+regressors_list = [
+    linear_model.Lasso(), 
+    linear_model.Ridge(), 
+    KNeighborsRegressor(), 
+    SVR(), DecisionTreeRegressor()
+]
 
-#partition_name = './Datasets/Abalone/abalone-5-'
-#partition_name = './Datasets/Concrete/concrete-5-'
-#partition_name = './Datasets/Liver/liver-5-'
-#partition_name = './Datasets/Machine_CPU/machineCPU-5-'
-#partition_name = './Datasets/Real_estate/Real_estate-5-'
-partition_name = './Datasets/Student_marks/student_marks-5-' 
-#partition_name = './Datasets/Wine_quality_red/winequality-red-5-'
-#partition_name = './Datasets/Wine_quality_white/winequality-white-5-'
-#partition_name = './Datasets/Yacht/yacht_hydrodynamics-5-'
+def run_experiment(dataset_alias, n_fold=5):
+    partition_name = partitions_dict[dataset_alias]
+    ensemble = DESRegression(
+        regressors_list=regressors_list,
+        random_state=0,
+        n_estimators_bag=20,
+        competence_region='cluster',
+        k=3,
+        competence_level=em.sum_absolute_error,
+        include_instance_hardness=False
+    )
 
-n_fold = 5
+    ensemble_ih = DESRegression(
+        regressors_list=regressors_list,
+        random_state=0,
+        n_estimators_bag=20,
+        competence_region='cluster',
+        k=5,
+        competence_level=em.sum_absolute_error_weighted,
+        include_instance_hardness=True
+    )
 
-errors_DES = []
-errors_DRS = []
-errors_SE = []
-for p in range(1,n_fold+1):
-    name_train = partition_name+str(p)+'tra.dat'
-    print(name_train)
-    name_test = partition_name+str(p)+'tst.dat'
-    print(name_test)
-    
-    data_train = pd.read_csv(name_train,header = None)
-    X_train = data_train.iloc[:,:-1].to_numpy()
-    y_train = np.ravel(data_train.iloc[:, -1:])
+    linear_reg = linear_model.LinearRegression()
 
-    data_test = pd.read_csv(name_test, header=None)
-    X_test = data_test.iloc[:,:-1].to_numpy()
-    y_test = np.ravel(data_test.iloc[:, -1:])
-
-    
-    ensemble.fit(X_train, y_train)
-
+    for fold in range(1, n_fold + 1):
+        print(f'========== Processing {dataset_alias} - Fold {fold} ==========')
         
-    print('Partition '+ str(p))
-    
-    params = {'ensemble_type': 'DES'} 
-    y_pred_DES = ensemble.predict(X_test, params)
-    error = mean_squared_error(y_test, y_pred_DES)
-    errors_DES.append(error)
-    print('DES error prediction:', error)
-    
-    params = {'ensemble_type': 'DRS'}
-    y_pred_DRS = ensemble.predict(X_test, params)
-    error = mean_squared_error(y_test, y_pred_DRS)
-    errors_DRS.append(error)
-    print('DRS error prediction:', error)
-    
-    params = {'ensemble_type': 'SE'}
-    y_pred_SE = ensemble.predict(X_test, params)
-    error = mean_squared_error(y_test, y_pred_SE)
-    errors_SE.append(error)
-    print('SE error prediction:', error)
+        # Load data
+        name_train = partition_name + str(fold) + 'tra.dat'
+        name_test = partition_name + str(fold) + 'tst.dat'
+        
+        data_train = pd.read_csv(name_train, header=None)
+        X_train = data_train.iloc[:, :-1].to_numpy()
+        y_train = np.ravel(data_train.iloc[:, -1:])
 
-mean_errors_DES = np.mean(errors_DES)
-print('Mean error DES', mean_errors_DES)
+        data_test = pd.read_csv(name_test, header=None)
+        X_test = data_test.iloc[:, :-1].to_numpy()
+        y_test = np.ravel(data_test.iloc[:, -1:])
 
-mean_errors_DRS = np.mean(errors_DRS)
-print('Mean error DRS', mean_errors_DRS)
+        # Fit models
+        ensemble.fit(X_train, y_train)
+        ensemble_ih.fit(X_train, y_train)
+        linear_reg.fit(X_train, y_train)
 
-mean_errors_SE = np.mean(errors_SE)
-print('Mean error SE', mean_errors_SE)
+        # Get predictions and errors
+        y_pred_des = ensemble.predict(X_test, {'ensemble_type': 'SE'})
+        y_pred_des_ih = ensemble_ih.predict(X_test, {'ensemble_type': 'DES'})
+        y_pred_linear = linear_reg.predict(X_test)
 
+        # Calculate errors
+        mse_des = mean_squared_error(y_test, y_pred_des)
+        r2_des = r2_score(y_test, y_pred_des)
+        mae_des = mean_absolute_error(y_test, y_pred_des)
+        rmse_des = np.sqrt(mse_des)
+        mape_des = mean_absolute_percentage_error(y_test, y_pred_des)
+        
+        # Ensemble with instance hardness
+        mse_des_ih = mean_squared_error(y_test, y_pred_des_ih)
+        r2_des_ih = r2_score(y_test, y_pred_des_ih)
+        mae_des_ih = mean_absolute_error(y_test, y_pred_des_ih)
+        rmse_des_ih = np.sqrt(mse_des_ih)
+        mape_des_ih = mean_absolute_percentage_error(y_test, y_pred_des_ih)
+        
+        # Linear regression
+        mse_linear = mean_squared_error(y_test, y_pred_linear)
+        r2_linear = r2_score(y_test, y_pred_linear)
+        mae_linear = mean_absolute_error(y_test, y_pred_linear)
+        rmse_linear = np.sqrt(mse_linear)
+        mape_linear = mean_absolute_percentage_error(y_test, y_pred_linear)
 
+        # Add results to DataFrame
+        results.loc[len(results)] = [dataset_alias, 'DES', fold, mse_des, r2_des, mae_des, rmse_des, mape_des]
+        results.loc[len(results)] = [dataset_alias, 'DES_IH', fold, mse_des_ih, r2_des_ih, mae_des_ih, rmse_des_ih, mape_des_ih]
+        results.loc[len(results)] = [dataset_alias, 'Linear', fold, mse_linear, r2_linear, mae_linear, rmse_linear, mape_linear]
 
+# Run experiments for all datasets
+for dataset in partitions_dict.keys():
+    try:
+        run_experiment(dataset)
+    except Exception as e:
+        print(f"Error processing {dataset}: {str(e)}")
 
+# Calculate summary statistics
+summary = results.groupby(['Dataset', 'Method']).agg({
+    'MSE': ['mean', 'std'],
+    'R2': ['mean', 'std'],
+    'MAE': ['mean', 'std'],
+    'RMSE': ['mean', 'std'],
+    'MAPE': ['mean', 'std']
+}).round(4)
 
+# Save results
+timestamp = dt.datetime.now().strftime('%Y%m%d_%H%M%S')
+results.to_csv(f'detailed_results_{timestamp}.csv', index=False)
+summary.to_csv(f'summary_results_{timestamp}.csv')
 
+# Print summary table
+print("\n=== Summary Results ===")
+print(summary)
