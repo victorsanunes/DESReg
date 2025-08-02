@@ -137,6 +137,9 @@ def compute_regression_measures(df: dict, measures_list: list = None) -> tuple:
     
     # Calculate all measures
     regression_measures_df = regression_measures.calculate_all(measures_list=measures_list)
+    for measure in measures_list:
+        regression_measures_df = compute_inverse_measure(regression_measures_df, measure)
+
     return regression_measures_df
 
 def create_pool_regressors(df: pd.DataFrame) -> RegressorsPool:
@@ -186,6 +189,11 @@ def process_name(df: pd.DataFrame) -> pd.DataFrame:
         else:
             renamed_columns.append(col)
     df_.columns = renamed_columns
+    return df_
+
+def compute_inverse_measure(df: pd.DataFrame, measure_name: str) -> pd.DataFrame:
+    df_ = df.copy()
+    df_['inverse_'+measure_name] = 1 - df_[f'feature_{measure_name}']
     return df_
 
 def get_hardness_measures(X, y, measures_list: dict = None):
