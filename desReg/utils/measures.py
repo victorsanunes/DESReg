@@ -76,6 +76,9 @@ def sum_squared_error(y_true, y_pred, normalized_distances):
 
     return np.dot(np.square(y_true - y_pred), normalized_distances)  
 
+def sum_squared_error_weighted(y_true, y_pred, weights):
+    return np.dot(np.square(y_true - y_pred), weights)
+
 def minimum_squared_error(y_true, y_pred, normalized_distances):
 
     """
@@ -95,6 +98,9 @@ def minimum_squared_error(y_true, y_pred, normalized_distances):
     """
     return np.min(np.multiply(np.square(y_true - y_pred), normalized_distances)) 
 
+def minimum_squared_error_weighted(y_true, y_pred, weights):
+    return np.min(np.multiply(np.square(y_true - y_pred), weights))
+
 def maximum_squared_error(y_true, y_pred, normalized_distances):    
 
     """
@@ -113,7 +119,10 @@ def maximum_squared_error(y_true, y_pred, normalized_distances):
         The maximum square error of the product between the error and the normalized_distances
     """
     return np.max(np.multiply(np.square(y_true - y_pred), normalized_distances)) 
-                    
+
+def maximum_squared_error_weighted(y_true, y_pred, weights):
+    return np.max(np.multiply(np.square(y_true - y_pred), weights))
+
 def neighbors_similarity(y_true, normalized_distances, y_pred_test):   
     """
     Parameters
@@ -149,8 +158,10 @@ def root_sum_squared_error(y_true, y_pred, normalized_distances):
         The dot product between the root mean square error and the normalizeed_distances
     """   
     return np.sqrt(np.dot(np.square(y_true - y_pred), normalized_distances)) 
-                    
-    
+
+def root_sum_squared_error_weighted(y_true, y_pred, weights):
+    return np.sqrt(np.dot(np.square(y_true - y_pred), weights))
+
 def closest_squared_error(y_true, y_pred, dists):
     """
     Parameters
@@ -192,6 +203,17 @@ def custom_weighted_error(y_true, y_pred, weights):
     """
     return np.dot(y_true - y_pred, weights)
 
+def all_errors_weighted(y_true, y_pred, dists, y_pred_test, weights):
+    errors = []
+    errors = np.append(errors, variance_error(y_pred))
+    errors = np.append(errors, sum_absolute_error_weighted(y_true, y_pred, weights))
+    errors = np.append(errors, sum_squared_error(y_true, y_pred, dists))
+    errors = np.append(errors, minimum_squared_error_weighted(y_true, y_pred, weights))
+    errors = np.append(errors, maximum_squared_error_weighted(y_true, y_pred, weights))
+    errors = np.append(errors, neighbors_similarity(y_true, weights, y_pred_test))
+    errors = np.append(errors, root_sum_squared_error_weighted(y_true, y_pred, weights))
+    errors = np.append(errors, closest_squared_error(y_true, y_pred, dists))
+    return errors
 
 def all_errors(y_true, y_pred, normalized_distances, dists, y_pred_test):
     """
