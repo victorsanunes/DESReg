@@ -10,7 +10,7 @@ from sklearn.utils.validation import (check_X_y, check_array,
                                      check_random_state)
 from sklearn.utils.validation import check_array
 from sklearn.preprocessing import MinMaxScaler
-
+from collections import Counter
 
 from scipy.spatial import distance
 
@@ -612,7 +612,7 @@ class DESRegression(BaseEstimator):
         
         selected_measures = self.competence_level_
         n_measures = len(selected_measures)
-        if em.all_errors in self.competence_level_:
+        if em.all_errors in self.competence_level_ or em.all_errors_weighted in self.competence_level_:
             n_measures = n_measures + em.N_ERROR_MEASURES -1
 
         regressors_errors = np.empty((0, n_measures))
@@ -626,7 +626,6 @@ class DESRegression(BaseEstimator):
         sum_inverse_distances = np.sum(inverse_distances)
         normalized_distances = inverse_distances/sum_inverse_distances
         weights = weights
-
         y_true = self.DSEL_target_[idxs]
         for reg in self.regressors_list_:
             errors = []
@@ -777,7 +776,7 @@ class DESRegression(BaseEstimator):
 ###          Prediction                                 ###
 ###########################################################
     
-    def predict(self, X, params=None):
+    def predict(self, X, params=None, return_ensemble_sizes=False):
         """Calculate sample predictions using Dinamic Ensemble Selection
 
         Parameters
@@ -787,11 +786,15 @@ class DESRegression(BaseEstimator):
         params: dictionary 
             Name and value of the parameters to be changed. The regressor pool and DSEL remain unchanged. 
         If None the parameter values are those given when the ensemble object is created 
+        return_ensemble_sizes : bool, default=False
+            If True, also return ensemble size information for each prediction
         
         Returns
         -------
-        array of shape(n_samples)
+        predictions : array of shape(n_samples)
             The prediction of the ensemble for each sample in X
+        ensemble_sizes : array of shape(n_samples), optional
+            Number of regressors selected for each prediction (only returned if return_ensemble_sizes=True)
         """
         if not params is None:  
             self.set_params(**params)
@@ -802,12 +805,16 @@ class DESRegression(BaseEstimator):
         
         name_func = '_predict_' + self.ensemble_type_  
         func = getattr(self, name_func)
-            
-        y_pred = func(X)  
-                     
-        return y_pred  
+        
+        if return_ensemble_sizes:
+            # All ensemble types now support returning ensemble sizes
+            y_pred, ensemble_sizes = func(X, return_ensemble_sizes=True)
+            return y_pred, ensemble_sizes
+        else:
+            y_pred = func(X)
+            return y_pred  
 
-    def _predict_DES(self, X):
+    def _predict_DES(self, X, return_ensemble_sizes=False):
         """Calculate sample predictions using Dinamic Ensemble Selection
 
         Parameters
@@ -821,6 +828,7 @@ class DESRegression(BaseEstimator):
             The prediction of the ensemble for each sample in X
         """
         y_pred = []
+        ensemble_sizes = []
         for instance in X:
             instance = np.atleast_2d(instance)
 
@@ -832,11 +840,20 @@ class DESRegression(BaseEstimator):
             competence_levels = self._calculate_competence_level(idxs, dists, instance, weights)
             selected_regressors, selected_competence_levels = self._select_regressors_DES(competence_levels) 
             ensemble = selected_regressors
+            ensemble_freq = Counter([m.__class__.__name__ for m in ensemble])
+            ensemble_freq['TotalRegressors'] = len(ensemble)
+            ensemble_freq['DistinctRegressors'] = len(set([m.__class__.__name__ for m in ensemble]))
+            # breakpoint()
             predicted_output = self._aggregation(ensemble, instance, selected_competence_levels) 
             y_pred.append(predicted_output)
-        return y_pred  
+            if return_ensemble_sizes:
+                ensemble_sizes.append(ensemble_freq)
+        if return_ensemble_sizes:
+            return y_pred, ensemble_sizes
+        else:
+            return y_pred
 
-    def _predict_DRS(self, X):  
+    def _predict_DRS(self, X, return_ensemble_sizes=False):  
         
         """Calculate sample predictions using the best ensemble regressor
 
@@ -852,6 +869,7 @@ class DESRegression(BaseEstimator):
         """
 
         y_pred = []
+        ensemble_sizes = []
         for instance in X:
             instance = np.atleast_2d(instance)
             name_func = '_competence_region_' + self.competence_region_  
@@ -862,9 +880,15 @@ class DESRegression(BaseEstimator):
             selected_regressor = self._select_regressors_DRS(competence_levels) 
             predicted_output = selected_regressor.predict(instance).reshape(-1)
             y_pred.append(predicted_output)
-        return y_pred  
+            ensemble_freq = Counter([selected_regressor.__class__.__name__])
+            if return_ensemble_sizes:
+                ensemble_sizes.append(ensemble_freq)
+        if return_ensemble_sizes:
+            return y_pred, ensemble_sizes
+        else:
+            return y_pred
     
-    def _predict_SE(self, X):  
+    def _predict_SE(self, X, return_ensemble_sizes=False):  
         
         """Calculate sample predictions using the static ensemble methodology. All regressors in the pool are used for prediction
 
@@ -872,11 +896,15 @@ class DESRegression(BaseEstimator):
         ----------
         X : array of shape (n_samples, n_features)
             Samples
+        return_ensemble_sizes : bool, default=False
+            If True, also return ensemble size information for each prediction
         
         Returns
         -------
          array of shape(n_samples)
             The prediction of the static ensemble for each sample in X
+         ensemble_sizes : array of shape(n_samples), optional
+            Number of regressors selected for each prediction (only returned if return_ensemble_sizes=True)
         """
          
         y_pred = []
@@ -887,7 +915,12 @@ class DESRegression(BaseEstimator):
         
         y_pred = np.mean(predictions, axis = 0)
         
-        return y_pred
+        if return_ensemble_sizes:
+            # ensemble_sizes = np.full(len(y_pred), self.n_regressors_, dtype=int)
+            ensemble_freq = [Counter([m.__class__.__name__ for m in ensemble])]
+            return y_pred, ensemble_freq
+        else:
+            return y_pred
     
     def get_available_meta_features(self):
         """Return the available meta features for instance hardness and hardness measures."""
