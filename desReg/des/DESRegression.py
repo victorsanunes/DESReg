@@ -8,9 +8,9 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.cluster import KMeans
 from sklearn.utils.validation import (check_X_y, check_array,
                                      check_random_state)
-from sklearn.utils.validation import check_array
 from sklearn.preprocessing import MinMaxScaler
 from collections import Counter
+from sklearn.metrics import mean_squared_error
 
 from scipy.spatial import distance
 
@@ -318,7 +318,7 @@ class DESRegression(BaseEstimator):
             X_train, X_dsel, y_train, y_dsel = train_test_split(
                     X, y, test_size=self.DSEL_perc_, random_state=self.random_state_)
         
-        if self.XTRAIN_full == True:  
+        if self.XTRAIN_full:  
             X_train = X
             y_train = y    
 
@@ -636,16 +636,16 @@ class DESRegression(BaseEstimator):
                 params = signature(func).parameters
                 
                 # Build parameters dict including both normalized_distances and weights
-                l = []
+                param_items = []
                 # logger.info(f"Parameters: {params}")
                 for param in params:
                     if param == 'weights':
-                        l.append((param, weights))
+                        param_items.append((param, weights))
                     elif param == 'normalized_distances':
-                        l.append((param, normalized_distances))
+                        param_items.append((param, normalized_distances))
                     elif param in locals():
-                        l.append((param, locals()[param]))
-                wargsk = dict(l)
+                        param_items.append((param, locals()[param]))
+                wargsk = dict(param_items)
                 error = func(**wargsk)
                 
                 errors = np.append(errors, error)
@@ -796,12 +796,15 @@ class DESRegression(BaseEstimator):
         ensemble_sizes : array of shape(n_samples), optional
             Number of regressors selected for each prediction (only returned if return_ensemble_sizes=True)
         """
-        if not params is None:  
+        if params is not None:  
             self.set_params(**params)
         
         params = self.get_params(deep=False) 
         
         self._validate_parameters()
+        
+        # Ensure X is a numeric 2D numpy array (handles pandas DataFrame inputs)
+        X = check_array(X)
         
         name_func = '_predict_' + self.ensemble_type_  
         func = getattr(self, name_func)
@@ -815,6 +818,7 @@ class DESRegression(BaseEstimator):
             return y_pred  
 
     def _predict_DES(self, X, return_ensemble_sizes=False):
+        logger.info("Predicting DES")
         """Calculate sample predictions using Dinamic Ensemble Selection
 
         Parameters
@@ -848,6 +852,7 @@ class DESRegression(BaseEstimator):
             y_pred.append(predicted_output)
             if return_ensemble_sizes:
                 ensemble_sizes.append(ensemble_freq)
+        y_pred = np.asarray(y_pred).ravel()
         if return_ensemble_sizes:
             return y_pred, ensemble_sizes
         else:
@@ -878,11 +883,14 @@ class DESRegression(BaseEstimator):
             weights = ih_values if self.include_instance_hardness else hardness_values
             competence_levels = self._calculate_competence_level(idxs, dists, instance, weights) 
             selected_regressor = self._select_regressors_DRS(competence_levels) 
-            predicted_output = selected_regressor.predict(instance).reshape(-1)
+            predicted_output = selected_regressor.predict(instance).reshape(-1)[0]
             y_pred.append(predicted_output)
             ensemble_freq = Counter([selected_regressor.__class__.__name__])
+            ensemble_freq['TotalRegressors'] = 1
+            ensemble_freq['DistinctRegressors'] = 1
             if return_ensemble_sizes:
                 ensemble_sizes.append(ensemble_freq)
+        y_pred = np.asarray(y_pred).ravel()
         if return_ensemble_sizes:
             return y_pred, ensemble_sizes
         else:
@@ -907,18 +915,20 @@ class DESRegression(BaseEstimator):
             Number of regressors selected for each prediction (only returned if return_ensemble_sizes=True)
         """
          
-        y_pred = []
         ensemble = self.select_regressors_SE()
         predictions = []
         for reg in ensemble:
             predictions.append(reg.predict(X)) 
         
         y_pred = np.mean(predictions, axis = 0)
+        y_pred = np.asarray(y_pred).ravel()
         
         if return_ensemble_sizes:
-            # ensemble_sizes = np.full(len(y_pred), self.n_regressors_, dtype=int)
-            ensemble_freq = [Counter([m.__class__.__name__ for m in ensemble])]
-            return y_pred, ensemble_freq
+            base_counter = Counter([m.__class__.__name__ for m in ensemble])
+            base_counter['TotalRegressors'] = len(ensemble)
+            base_counter['DistinctRegressors'] = len(set([m.__class__.__name__ for m in ensemble]))
+            ensemble_sizes = [Counter(base_counter) for _ in range(len(y_pred))]
+            return y_pred, ensemble_sizes
         else:
             return y_pred
     
@@ -960,4 +970,26 @@ class DESRegression(BaseEstimator):
         
         return self.meta_feature
 
-    
+    def score(self, X, y, sample_weight=None):
+        """Return mean squared error (MSE) by default.
+
+        Parameters
+        ----------
+        X : array-like of shape (n_samples, n_features)
+        y : array-like of shape (n_samples,)
+        sample_weight : array-like, optional
+
+        Returns
+        -------
+        float
+            Mean squared error (lower is better).
+        """
+        y_pred = self.predict(X)
+        # Normalize predictions to a 1D numpy array
+        if isinstance(y_pred, list) and len(y_pred) > 0 and isinstance(y_pred[0], np.ndarray):
+            y_pred = np.concatenate([np.ravel(p) for p in y_pred])
+        else:
+            y_pred = np.asarray(y_pred).ravel()
+        y_true = np.asarray(y).ravel()
+        return mean_squared_error(y_true, y_pred, sample_weight=sample_weight)
+

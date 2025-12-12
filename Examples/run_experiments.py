@@ -14,6 +14,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error, mean_absolute_percentage_error
 from sklearn.model_selection import KFold
+from sklearn.base import clone
 from collections import Counter
 warnings.filterwarnings('ignore', category=FutureWarning)
 warnings.filterwarnings('ignore', message='The default value of `dual` will change')
@@ -176,7 +177,8 @@ def run_experiment_with_timeout(
         # Run challenger models
         for model_name in challenger_experiments.keys():
             print(f"Running challenger model: {model_name}...")
-            model = challenger_experiments[model_name]['model']   
+            model_template = challenger_experiments[model_name]['model']   
+            model = clone(model_template)
             params = challenger_experiments[model_name].get("params", None)
             challenger_result = run_model_with_timeout(
                 model, model_name, X_train, y_train, X_test, y_test, timeout_seconds, params
@@ -217,6 +219,7 @@ def get_agg_results(results_df):
         'execution_time': ['mean', 'std', 'sum'],
         'partition_size': ['sum']
     }).round(4)
+    breakpoint()
     ensembles_counter_df = pd.json_normalize(agg_results[('ensemble_sizes', 'sum_freqs')])\
         .set_index(agg_results.index)
     ensembles_counter_df.columns = pd.MultiIndex.from_product([['algo_name'], ensembles_counter_df.columns])
